@@ -94,9 +94,14 @@ export class SearchEngine {
 
 export class ArticleManager {
   async downloadPdf(article: Article): Promise<string> {
-    if (!article.pdfUrl) throw new Error('No PDF URL available');
-    // In the MVP we simply return the URL – the front‑end opens it in a new tab.
-    return article.pdfUrl;
+    if (article.pdfUrl) return article.pdfUrl;
+    
+    // Fallback to the article's web page if a direct PDF link isn't available
+    if (article.source === 'pubmed') return `https://pubmed.ncbi.nlm.nih.gov/${article.id}/`;
+    if (article.source === 'arxiv') return `https://arxiv.org/abs/${article.id}`;
+    if (article.source === 'europepmc') return `https://europepmc.org/article/MED/${article.id}`;
+
+    throw new Error('Link não disponível');
   }
 }
 
