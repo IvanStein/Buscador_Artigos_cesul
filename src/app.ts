@@ -20,15 +20,20 @@ export class ConfigManager {
 }
 
 export class SearchEngine {
-  // Use Groq to generate intelligent search topics, or fallback to simple extraction
   async generateTopics(lessonText: string): Promise<string[]> {
     const groqKey = ConfigManager.getGroqKey();
-    if (!groqKey) {
-      // Fallback simple keyword extraction
+    
+    const fallbackExtraction = () => {
       const words = lessonText.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 4);
+      if (words.length === 0) return lessonText.split(' ').slice(0, 3);
       const freq: Record<string, number> = {};
       for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
       return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+    };
+
+    if (!groqKey) {
+      // Fallback simple keyword extraction
+      return fallbackExtraction();
     }
 
     try {
@@ -50,12 +55,24 @@ export class SearchEngine {
           temperature: 0.3
         })
       });
+      
       const data = await resp.json();
+      
+      if (!resp.ok) {
+        console.error('Groq API error response:', data);
+        throw new Error(data.error?.message || 'Groq API request failed');
+      }
+
       const content = data.choices?.[0]?.message?.content || '';
-      return content.split(',').map((s: string) => s.trim()).filter(Boolean);
+      const topics = content.split(',').map((s: string) => s.trim()).filter(Boolean);
+      
+      if (topics.length === 0) {
+         return fallbackExtraction();
+      }
+      return topics;
     } catch (err) {
       console.error('Groq AI error:', err);
-      return lessonText.split(' ').slice(0, 3);
+      return fallbackExtraction();
     }
   }
 
@@ -132,6 +149,14 @@ export class ArticleManager {
   }
 }
 
+export interface TelegramMessage {
+  id: number;
+  chatId: number;
+  senderName: string;
+  text: string;
+  date: number;
+}
+
 export class TelegramNotifier {
   private chatId = '';
   setChat(chatId: string) {
@@ -148,6 +173,39 @@ export class TelegramNotifier {
       });
     } catch (e) {
       console.error('Telegram error:', e);
+    }
+  }
+
+  async getUpdates(offset: number = 0): Promise<{ messages: TelegramMessage[], nextOffset: number }> {
+    const token = ConfigManager.getTelegramToken();
+    if (!token) return { messages: [], nextOffset: offset };
+
+    try {
+      const resp = await fetch(`https://api.telegram.org/bot${token}/getUpdates?offset=${offset}&timeout=10`);
+      const data = await resp.json();
+      if (!data.ok) return { messages: [], nextOffset: offset };
+
+      const messages: TelegramMessage[] = [];
+      let nextOffset = offset;
+
+      for (const item of data.result) {
+        if (item.update_id >= nextOffset) {
+          nextOffset = item.update_id + 1;
+        }
+        if (item.message && item.message.text) {
+          messages.push({
+            id: item.message.message_id,
+            chatId: item.message.chat.id,
+            senderName: item.message.from?.first_name || 'Usuário',
+            text: item.message.text,
+            date: item.message.date * 1000,
+          });
+        }
+      }
+      return { messages, nextOffset };
+    } catch (e) {
+      console.error('Telegram getUpdates error:', e);
+      return { messages: [], nextOffset: offset };
     }
   }
 }
