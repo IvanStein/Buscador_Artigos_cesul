@@ -1,5 +1,5 @@
 import './styles.css';
-import App from './app.ts';
+import { App, ConfigManager } from './app';
 
 const app = new App();
 
@@ -14,6 +14,14 @@ const cartCount = document.getElementById('cartCount') as HTMLElement;
 const btnNextPage = document.getElementById('btnNextPage') as HTMLButtonElement;
 const btnBackSearch = document.getElementById('btnBackSearch') as HTMLButtonElement;
 const selectedResults = document.getElementById('selectedResults') as HTMLElement;
+
+// Settings UI
+const btnSettings = document.getElementById('btnSettings') as HTMLButtonElement;
+const settingsModal = document.getElementById('settingsModal') as HTMLElement;
+const btnCloseSettings = document.getElementById('btnCloseSettings') as HTMLButtonElement;
+const btnSaveSettings = document.getElementById('btnSaveSettings') as HTMLButtonElement;
+const inputGroqKey = document.getElementById('inputGroqKey') as HTMLInputElement;
+const inputTelegramToken = document.getElementById('inputTelegramToken') as HTMLInputElement;
 
 // State for selected articles
 let selectedArticles: any[] = [];
@@ -260,6 +268,24 @@ async function renderSelectedArticles() {
     });
   }
 }
+
+// Settings Logic
+btnSettings.onclick = () => {
+  inputGroqKey.value = ConfigManager.getGroqKey();
+  inputTelegramToken.value = ConfigManager.getTelegramToken();
+  settingsModal.style.display = 'flex';
+};
+
+btnCloseSettings.onclick = () => {
+  settingsModal.style.display = 'none';
+};
+
+btnSaveSettings.onclick = () => {
+  ConfigManager.setGroqKey(inputGroqKey.value.trim());
+  ConfigManager.setTelegramToken(inputTelegramToken.value.trim());
+  settingsModal.style.display = 'none';
+  alert('Configurações salvas localmente com sucesso!');
+};
 
 // Initialize UI
 renderHistory();

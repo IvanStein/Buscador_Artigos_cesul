@@ -4,16 +4,26 @@ import { searchPubMed, searchArxiv, searchEuropePMC, type Article as RealArticle
 // Re-export the expanded article interface
 export type Article = RealArticle;
 
-export class SearchEngine {
-  private groqApiKey: string;
-
-  constructor() {
-    this.groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
+export class ConfigManager {
+  static getGroqKey(): string {
+    return localStorage.getItem('api_key_groq') || import.meta.env.VITE_GROQ_API_KEY || '';
   }
+  static setGroqKey(key: string) {
+    localStorage.setItem('api_key_groq', key);
+  }
+  static getTelegramToken(): string {
+    return localStorage.getItem('api_key_telegram') || import.meta.env.VITE_TELEGRAM_BOT_TOKEN || '';
+  }
+  static setTelegramToken(token: string) {
+    localStorage.setItem('api_key_telegram', token);
+  }
+}
 
+export class SearchEngine {
   // Use Groq to generate intelligent search topics, or fallback to simple extraction
   async generateTopics(lessonText: string): Promise<string[]> {
-    if (!this.groqApiKey) {
+    const groqKey = ConfigManager.getGroqKey();
+    if (!groqKey) {
       // Fallback simple keyword extraction
       const words = lessonText.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 4);
       const freq: Record<string, number> = {};
@@ -25,7 +35,7 @@ export class SearchEngine {
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.groqApiKey}`,
+          'Authorization': `Bearer ${groqKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -52,13 +62,15 @@ export class SearchEngine {
   // Translate abstract using Groq
   async translateText(text: string): Promise<string> {
     if (!text || text === 'Resumo não disponível.') return text;
-    if (!this.groqApiKey) return '(Configure a chave VITE_GROQ_API_KEY no .env para habilitar tradução automática) ' + text;
+    
+    const groqKey = ConfigManager.getGroqKey();
+    if (!groqKey) return '(Configure a chave Groq nas Configurações do sistema para habilitar tradução automática) ' + text;
 
     try {
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${this.groqApiKey}`,
+          'Authorization': `Bearer ${groqKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
@@ -121,15 +133,15 @@ export class ArticleManager {
 }
 
 export class TelegramNotifier {
-  private token = '';
   private chatId = '';
   setChat(chatId: string) {
     this.chatId = chatId;
   }
   async sendMessage(text: string) {
-    if (!this.token || !this.chatId) return;
+    const token = ConfigManager.getTelegramToken();
+    if (!token || !this.chatId) return;
     try {
-      await fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, {
+      await fetch(`https://api.telegram.org/bot${token}/sendMessage`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ chat_id: this.chatId, text }),
