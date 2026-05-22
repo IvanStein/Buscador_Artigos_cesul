@@ -10,6 +10,12 @@ export interface Article {
   abstract: string;
   pdfUrl?: string;
   source: 'PubMed' | 'arXiv' | 'EuropePMC';
+  year?: string;
+  journal?: string;
+  volume?: string;
+  issue?: string;
+  pages?: string;
+  doi?: string;
 }
 
 // PubMed search using NCBI E‑utilities (esearch + efetch)
@@ -33,9 +39,17 @@ export async function searchPubMed(query: string, maxResults = 10): Promise<Arti
     const authorList = Array.from(node.querySelectorAll('Author')).map((a) => {
       const fore = a.querySelector('ForeName')?.textContent?.trim() ?? '';
       const last = a.querySelector('LastName')?.textContent?.trim() ?? '';
-      return `${fore} ${last}`.trim();
+      return `${last}, ${fore}`.trim();
     });
-    articles.push({ id, title, authors: authorList, abstract, source: 'PubMed' });
+    const journal = (node.querySelector('Journal Title')?.textContent?.trim() || node.querySelector('Journal ISOAbbreviation')?.textContent?.trim()) ?? '';
+    const year = (node.querySelector('PubDate Year')?.textContent?.trim() || node.querySelector('ArticleDate Year')?.textContent?.trim()) ?? '';
+    const volume = node.querySelector('JournalIssue Volume')?.textContent?.trim() ?? '';
+    const issue = node.querySelector('JournalIssue Issue')?.textContent?.trim() ?? '';
+    const pages = node.querySelector('Pagination MedlinePgn')?.textContent?.trim() ?? '';
+    const doiNode = Array.from(node.querySelectorAll('ArticleId')).find(id => id.getAttribute('IdType') === 'doi');
+    const doi = doiNode ? doiNode.textContent?.trim() : '';
+
+    articles.push({ id, title, authors: authorList, abstract, source: 'PubMed', year, journal, volume, issue, pages, doi });
   });
   return articles;
 }
@@ -70,7 +84,12 @@ export async function searchArxiv(query: string, maxResults = 10): Promise<Artic
         break;
       }
     }
-    articles.push({ id, title, authors, abstract: summary, pdfUrl, source: 'arXiv' });
+    const published = entry.getElementsByTagName('published')[0]?.textContent?.trim() ?? '';
+    const year = published ? published.split('-')[0] : '';
+    const doi = Array.from(linkNodes).find(l => l.getAttribute('title') === 'doi')?.getAttribute('href')?.split('doi.org/')[1] ?? '';
+    const journal = 'arXiv preprint';
+
+    articles.push({ id, title, authors, abstract: summary, pdfUrl, source: 'arXiv', year, journal, doi });
   }
   return articles;
 }
@@ -88,5 +107,11 @@ export async function searchEuropePMC(query: string, maxResults = 10): Promise<A
     abstract: item.abstractText ?? '',
     pdfUrl: item.fullTextUrl?.[0]?.url,
     source: 'EuropePMC' as const,
+    year: item.pubYear ?? '',
+    journal: item.journalTitle ?? '',
+    volume: item.journalVolume ?? '',
+    issue: item.issue ?? '',
+    pages: item.pageInfo ?? '',
+    doi: item.doi ?? '',
   }));
 }

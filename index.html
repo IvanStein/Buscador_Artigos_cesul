@@ -9,16 +9,32 @@
 </head>
 <body>
   <div id="app">
-    <h1 class="card">Assistente de Busca de Artigos</h1>
-    <div class="card">
-      <textarea id="lessonInput" placeholder="Descreva o tema da aula (ex.: Ciência de Dados no cotidiano)..."></textarea>
-      <button id="searchBtn">🔍 Buscar Artigos</button>
-    </div>
-    <div id="history" class="card">
-      <h3>Histórico de pesquisas</h3>
-      <p>As últimas ideias inseridas aparecerão aqui.</p>
-    </div>
-    <div id="results" class="card"></div>
+    <aside class="sidebar">
+      <div id="history" class="card history-card">
+        <h3>Histórico de pesquisas</h3>
+        <p class="history-empty">As últimas ideias inseridas aparecerão aqui.</p>
+        <ul id="historyList" class="history-list"></ul>
+      </div>
+      <div id="selectedCart" class="card cart-card" style="display: none;">
+        <h3>Artigos Selecionados (<span id="cartCount">0</span>)</h3>
+        <button id="btnNextPage" class="btn-primary">Avançar para Aula ➡️</button>
+      </div>
+    </aside>
+
+    <main class="main-content" id="mainSearch">
+      <h1 class="card">Assistente de Busca de Artigos</h1>
+      <div class="card">
+        <textarea id="lessonInput" placeholder="Descreva o tema da aula (ex.: Ciência de Dados no cotidiano)..."></textarea>
+        <button id="searchBtn">🔍 Buscar Artigos</button>
+      </div>
+      <div id="results" class="card" style="min-height: 200px;"></div>
+    </main>
+
+    <main class="main-content" id="mainSelected" style="display: none;">
+      <h1 class="card">Material da Aula</h1>
+      <button id="btnBackSearch" class="btn-secondary">⬅️ Voltar para Busca</button>
+      <div id="selectedResults" class="card"></div>
+    </main>
   </div>
   <script type="module" src="/src/main.ts"></script>
 </body>

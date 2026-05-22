@@ -1,94 +1,93 @@
 /* src/app.ts */
-// Core logic for article search – browser‑only (no Node process env)
+import { searchPubMed, searchArxiv, searchEuropePMC, type Article as RealArticle } from '../skills/searchEngine';
 
-export interface Article {
-  id: string;
-  title: string;
-  authors: string[];
-  abstract: string;
-  pdfUrl?: string; // direct link to PDF if available
-  source: 'pubmed' | 'arxiv' | 'europepmc';
-}
+// Re-export the expanded article interface
+export type Article = RealArticle;
 
 export class SearchEngine {
-  // No direct access to process.env – Vite exposes env vars via import.meta.env
-  // If needed later, you can read VITE_* variables here.
+  private groqApiKey: string;
 
-  // Simple keyword extraction for MVP
-  generateTopics(lessonText: string): string[] {
-    const words = lessonText
-      .toLowerCase()
-      .replace(/[^a-z0-9\s]/g, '')
-      .split(/\s+/)
-      .filter(w => w.length > 4);
-    const freq: Record<string, number> = {};
-    for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
-    return Object.entries(freq)
-      .sort((a, b) => b[1] - a[1])
-      .slice(0, 5)
-      .map(entry => entry[0]);
+  constructor() {
+    this.groqApiKey = import.meta.env.VITE_GROQ_API_KEY || '';
+  }
+
+  // Use Groq to generate intelligent search topics, or fallback to simple extraction
+  async generateTopics(lessonText: string): Promise<string[]> {
+    if (!this.groqApiKey) {
+      // Fallback simple keyword extraction
+      const words = lessonText.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 4);
+      const freq: Record<string, number> = {};
+      for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
+      return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+    }
+
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.groqApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama3-8b-8192',
+          messages: [{
+            role: 'system',
+            content: 'Extraia 3 a 5 palavras-chave ou termos de busca curtos (em inglês) do seguinte tema de aula. Retorne APENAS os termos separados por vírgula.'
+          }, {
+            role: 'user',
+            content: lessonText
+          }],
+          temperature: 0.3
+        })
+      });
+      const data = await resp.json();
+      const content = data.choices?.[0]?.message?.content || '';
+      return content.split(',').map((s: string) => s.trim()).filter(Boolean);
+    } catch (err) {
+      console.error('Groq AI error:', err);
+      return lessonText.split(' ').slice(0, 3);
+    }
+  }
+
+  // Translate abstract using Groq
+  async translateText(text: string): Promise<string> {
+    if (!text || text === 'Resumo não disponível.') return text;
+    if (!this.groqApiKey) return '(Configure a chave VITE_GROQ_API_KEY no .env para habilitar tradução automática) ' + text;
+
+    try {
+      const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${this.groqApiKey}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          model: 'llama3-8b-8192',
+          messages: [{
+            role: 'system',
+            content: 'Traduza o seguinte resumo científico (abstract) do inglês para o português do Brasil. Mantenha o jargão científico correto e um tom acadêmico.'
+          }, {
+            role: 'user',
+            content: text
+          }],
+          temperature: 0.2
+        })
+      });
+      const data = await resp.json();
+      return data.choices?.[0]?.message?.content || 'Erro ao traduzir.';
+    } catch (err) {
+      console.error('Translation error:', err);
+      return 'Erro de conexão na tradução.';
+    }
   }
 
   async searchAll(query: string): Promise<Article[]> {
     const [pubmed, arxiv, epmc] = await Promise.all([
-      this.searchPubMed(query).catch(e => { console.error('PubMed error:', e); return []; }),
-      this.searchArxiv(query).catch(e => { console.error('arXiv error:', e); return []; }),
-      this.searchEuropePMC(query).catch(e => { console.error('EuropePMC error:', e); return []; }),
+      searchPubMed(query).catch(e => { console.error('PubMed error:', e); return []; }),
+      searchArxiv(query).catch(e => { console.error('arXiv error:', e); return []; }),
+      searchEuropePMC(query).catch(e => { console.error('EuropePMC error:', e); return []; }),
     ]);
     return [...pubmed, ...arxiv, ...epmc];
-  }
-
-  async searchPubMed(query: string): Promise<Article[]> {
-    const url = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esearch.fcgi?db=pubmed&term=${encodeURIComponent(
-      query,
-    )}&retmax=5&format=json`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    const ids = data.esearchresult?.idlist || [];
-    // For MVP we mock the metadata – real implementation would fetch details via efetch.
-    return ids.map((id: string) => ({
-      id,
-      title: `PubMed article ${id}`,
-      authors: [],
-      abstract: `Abstract for PubMed ${id}`,
-      source: 'pubmed',
-    }));
-  }
-
-  async searchArxiv(query: string): Promise<Article[]> {
-    const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(
-      query,
-    )}&max_results=5`;
-    const resp = await fetch(url);
-    const text = await resp.text();
-    const parser = new DOMParser();
-    const xml = parser.parseFromString(text, 'application/xml');
-    const entries = Array.from(xml.querySelectorAll('entry'));
-    return entries.map((e, idx) => {
-      const id = e.querySelector('id')?.textContent?.split('/').pop() ?? `arxiv-${idx}`;
-      const title = e.querySelector('title')?.textContent?.trim() ?? 'Untitled';
-      const summary = e.querySelector('summary')?.textContent?.trim() ?? '';
-      const pdfLink = Array.from(e.querySelectorAll('link')).find(l => l.getAttribute('title') === 'pdf')?.getAttribute('href');
-      return { id, title, authors: [], abstract: summary, pdfUrl: pdfLink, source: 'arxiv' } as Article;
-    });
-  }
-
-  async searchEuropePMC(query: string): Promise<Article[]> {
-    const url = `https://www.ebi.ac.uk/europepmc/webservices/rest/search?query=${encodeURIComponent(
-      query,
-    )}&pageSize=5&format=json`;
-    const resp = await fetch(url);
-    const data = await resp.json();
-    const resultList = data.resultList?.result || [];
-    return resultList.map((r: any) => ({
-      id: r.id,
-      title: r.title,
-
-      authors: (r.authorString ?? '').split(',').map((a: string) => a.trim()),
-      abstract: r.abstractText ?? '',
-      pdfUrl: r.fullTextUrl?.url,
-      source: 'europepmc',
-    } as Article));
   }
 }
 
@@ -97,11 +96,27 @@ export class ArticleManager {
     if (article.pdfUrl) return article.pdfUrl;
     
     // Fallback to the article's web page if a direct PDF link isn't available
-    if (article.source === 'pubmed') return `https://pubmed.ncbi.nlm.nih.gov/${article.id}/`;
-    if (article.source === 'arxiv') return `https://arxiv.org/abs/${article.id}`;
-    if (article.source === 'europepmc') return `https://europepmc.org/article/MED/${article.id}`;
+    if (article.source.toLowerCase() === 'pubmed') return `https://pubmed.ncbi.nlm.nih.gov/${article.id}/`;
+    if (article.source.toLowerCase() === 'arxiv') return `https://arxiv.org/abs/${article.id}`;
+    if (article.source.toLowerCase() === 'europepmc') return `https://europepmc.org/article/MED/${article.id}`;
 
     throw new Error('Link não disponível');
+  }
+
+  generateABNT(a: Article): string {
+    const authors = a.authors && a.authors.length > 0 
+      ? a.authors.join('; ').toUpperCase() 
+      : 'AUTOR DESCONHECIDO';
+    const title = a.title || 'Título indisponível';
+    const journal = (a as any).journal ? (a as any).journal : a.source;
+    const year = (a as any).year || 's.d.';
+    const vol = (a as any).volume ? `v. ${(a as any).volume}, ` : '';
+    const issue = (a as any).issue ? `n. ${(a as any).issue}, ` : '';
+    const pages = (a as any).pages ? `p. ${(a as any).pages}, ` : '';
+    const doiPart = (a as any).doi ? ` DOI: ${(a as any).doi}.` : '';
+    const urlPart = a.pdfUrl ? ` Disponível em: <${a.pdfUrl}>.` : '';
+    
+    return `${authors}. ${title}. ${journal}, ${vol}${issue}${pages}${year}.${doiPart}${urlPart}`;
   }
 }
 
@@ -113,12 +128,15 @@ export class TelegramNotifier {
   }
   async sendMessage(text: string) {
     if (!this.token || !this.chatId) return;
-    const url = `https://api.telegram.org/bot${this.token}/sendMessage`;
-    await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ chat_id: this.chatId, text }),
-    });
+    try {
+      await fetch(`https://api.telegram.org/bot${this.token}/sendMessage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ chat_id: this.chatId, text }),
+      });
+    } catch (e) {
+      console.error('Telegram error:', e);
+    }
   }
 }
 
@@ -135,12 +153,12 @@ export class YouTubeDownloader {
 }
 
 export class App {
-  private engine = new SearchEngine();
+  public engine = new SearchEngine();
   public articleMgr = new ArticleManager();
   private telegram = new TelegramNotifier();
 
   async runLesson(lessonText: string) {
-    const topics = this.engine.generateTopics(lessonText);
+    const topics = await this.engine.generateTopics(lessonText);
     // Send a brief notification (optional) – token can be set via env later.
     await this.telegram.sendMessage(`🔍 Gerando tópicos para: ${lessonText}`);
     // Clear previous results (UI handled by main.ts)
