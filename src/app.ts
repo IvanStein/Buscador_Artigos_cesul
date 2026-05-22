@@ -1,5 +1,5 @@
 /* src/app.ts */
-// Simple OO core for the MVP. All logic lives here and is used by main.ts.
+// Core logic for article search – browser‑only (no Node process env)
 
 export interface Article {
   id: string;
@@ -11,18 +11,16 @@ export interface Article {
 }
 
 export class SearchEngine {
-  private readonly tavilyKey = process.env.TAVILY_API_KEY ?? '';
-  private readonly groqKey = process.env.GROQ_API_KEY ?? '';
-  private readonly elsevierKey = process.env.ELSEVIER_API_KEY ?? '';
+  // No direct access to process.env – Vite exposes env vars via import.meta.env
+  // If needed later, you can read VITE_* variables here.
 
-  // Generate topics from lesson text – very naive implementation (keywords extraction).
+  // Simple keyword extraction for MVP
   generateTopics(lessonText: string): string[] {
     const words = lessonText
       .toLowerCase()
       .replace(/[^a-z0-9\s]/g, '')
       .split(/\s+/)
       .filter(w => w.length > 4);
-    // Return top 5 most frequent words as pseudo‑topics
     const freq: Record<string, number> = {};
     for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
     return Object.entries(freq)
@@ -46,11 +44,8 @@ export class SearchEngine {
     )}&retmax=5&format=json`;
     const resp = await fetch(url);
     const data = await resp.json();
-    const ids = data.esearchresult.idlist || [];
-    const fetchUrl = `https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id=${ids.join(',')}&rettype=abstract&retmode=json`;
-    const detailsResp = await fetch(fetchUrl);
-    const details = await detailsResp.json();
-    // Simplify – map to Article (real response is XML; for MVP we assume JSON fields)
+    const ids = data.esearchresult?.idlist || [];
+    // For MVP we mock the metadata – real implementation would fetch details via efetch.
     return ids.map((id: string) => ({
       id,
       title: `PubMed article ${id}`,
@@ -66,7 +61,6 @@ export class SearchEngine {
     )}&max_results=5`;
     const resp = await fetch(url);
     const text = await resp.text();
-    // Very light XML parsing – extract <entry> titles
     const parser = new DOMParser();
     const xml = parser.parseFromString(text, 'application/xml');
     const entries = Array.from(xml.querySelectorAll('entry'));
@@ -98,16 +92,15 @@ export class SearchEngine {
 }
 
 export class ArticleManager {
-  // Placeholder for future PDF download implementation.
   async downloadPdf(article: Article): Promise<string> {
     if (!article.pdfUrl) throw new Error('No PDF URL available');
-    // In the MVP the front‑end just returns the URL; actual download is handled server‑side.
+    // In the MVP we simply return the URL – the front‑end opens it in a new tab.
     return article.pdfUrl;
   }
 }
 
 export class TelegramNotifier {
-  private token = process.env.TELEGRAM_BOT_TOKEN ?? '';
+  private token = '';
   private chatId = '';
   setChat(chatId: string) {
     this.chatId = chatId;
@@ -124,7 +117,6 @@ export class TelegramNotifier {
 }
 
 export class YouTubeDownloader {
-  // This class will just forward a request to our serverless function.
   async download(url: string): Promise<string> {
     const resp = await fetch('/api/download', {
       method: 'POST',
@@ -132,7 +124,7 @@ export class YouTubeDownloader {
       body: JSON.stringify({ url }),
     });
     const data = await resp.json();
-    return data.fileUrl; // URL to the generated file on Vercel CDN
+    return data.fileUrl;
   }
 }
 
@@ -143,36 +135,16 @@ export class App {
 
   async runLesson(lessonText: string) {
     const topics = this.engine.generateTopics(lessonText);
-    const resultsDiv = document.getElementById('results') as HTMLElement;
-    resultsDiv.innerHTML = '';
-    this.telegram.sendMessage(`🔍 Gerando tópicos para: ${lessonText}`);
+    // Send a brief notification (optional) – token can be set via env later.
+    await this.telegram.sendMessage(`🔍 Gerando tópicos para: ${lessonText}`);
+    // Clear previous results (UI handled by main.ts)
     for (const t of topics) {
-      const header = document.createElement('h3');
-      header.textContent = `Tópico: ${t}`;
-      resultsDiv.appendChild(header);
       const articles = await this.engine.searchAll(t);
-      const ul = document.createElement('ul');
-      ul.className = 'list';
-      articles.forEach(a => {
-        const li = document.createElement('li');
-        li.innerHTML = `<strong>${a.title}</strong> <span>${a.source}</span>`;
-        const btn = document.createElement('button');
-        btn.textContent = 'Download PDF';
-        btn.onclick = async () => {
-          try {
-            const pdf = await this.articleMgr.downloadPdf(a);
-            window.open(pdf, '_blank');
-          } catch (e) {
-            alert('PDF não disponível');
-          }
-        };
-        li.appendChild(btn);
-        ul.appendChild(li);
-      });
-      resultsDiv.appendChild(ul);
+      // The UI rendering is performed in main.ts – we simply expose the data via a custom event.
+      const event = new CustomEvent('search-results', { detail: { topic: t, articles } });
+      window.dispatchEvent(event);
     }
   }
 }
 
-// Export for main.ts to instantiate
 export default App;

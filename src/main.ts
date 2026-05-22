@@ -49,5 +49,34 @@ searchBtn.addEventListener('click', () => {
   if (txt) startSearch(txt);
 });
 
+// Listen for search results dispatched by App
+window.addEventListener('search-results', (e: Event) => {
+  const custom = e as CustomEvent;
+  const { topic, articles } = custom.detail as { topic: string; articles: any[] };
+  const header = document.createElement('h3');
+  header.textContent = `Tópico: ${topic}`;
+  resultsDiv.appendChild(header);
+
+  const ul = document.createElement('ul');
+  ul.className = 'list';
+  articles.forEach(a => {
+    const li = document.createElement('li');
+    li.innerHTML = `<strong>${a.title}</strong> <span>${a.source}</span>`;
+    const btn = document.createElement('button');
+    btn.textContent = 'Download PDF';
+    btn.onclick = async () => {
+      try {
+        const pdf = await app.articleMgr.downloadPdf(a);
+        window.open(pdf, '_blank');
+      } catch (err) {
+        alert('PDF não disponível');
+      }
+    };
+    li.appendChild(btn);
+    ul.appendChild(li);
+  });
+  resultsDiv.appendChild(ul);
+});
+
 // Initialize UI
 renderHistory();
