@@ -39,7 +39,12 @@ function renderHistory() {
 
 async function startSearch(text: string) {
   lessonInput.value = text;
-  resultsDiv.innerHTML = '<p id="loadingMsg">⏳ Buscando artigos, por favor aguarde...</p>';
+  resultsDiv.innerHTML = `
+    <div id="loadingMsg" class="loading-container">
+      <div class="spinner"></div>
+      <p>Buscando nas fontes oficiais (PubMed, arXiv, Europe PMC)...</p>
+    </div>
+  `;
   searchBtn.disabled = true;
   searchBtn.textContent = 'Buscando...';
 
@@ -80,12 +85,24 @@ window.addEventListener('search-results', (e: Event) => {
   }
 
   const ul = document.createElement('ul');
-  ul.className = 'list';
+  ul.className = 'article-list';
   articles.forEach(a => {
     const li = document.createElement('li');
-    li.innerHTML = `<strong>${a.title}</strong> <span>${a.source}</span>`;
+    li.className = 'article-card';
+    
+    const sourceName = a.source === 'pubmed' ? 'PubMed' : a.source === 'arxiv' ? 'arXiv' : 'Europe PMC';
+    
+    li.innerHTML = `
+      <div class="article-info">
+        <h4 class="article-title">${a.title}</h4>
+        <div class="article-meta">
+          <span class="badge badge-${a.source}">${sourceName}</span>
+        </div>
+      </div>
+    `;
     const btn = document.createElement('button');
-    btn.textContent = 'Download PDF';
+    btn.className = 'btn-download';
+    btn.innerHTML = '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Download';
     btn.onclick = async () => {
       try {
         const pdf = await app.articleMgr.downloadPdf(a);
