@@ -31,9 +31,9 @@ export class SearchEngine {
 
   async searchAll(query: string): Promise<Article[]> {
     const [pubmed, arxiv, epmc] = await Promise.all([
-      this.searchPubMed(query),
-      this.searchArxiv(query),
-      this.searchEuropePMC(query),
+      this.searchPubMed(query).catch(e => { console.error('PubMed error:', e); return []; }),
+      this.searchArxiv(query).catch(e => { console.error('arXiv error:', e); return []; }),
+      this.searchEuropePMC(query).catch(e => { console.error('EuropePMC error:', e); return []; }),
     ]);
     return [...pubmed, ...arxiv, ...epmc];
   }

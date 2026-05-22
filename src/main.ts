@@ -39,7 +39,22 @@ function renderHistory() {
 
 async function startSearch(text: string) {
   lessonInput.value = text;
-  await app.runLesson(text);
+  resultsDiv.innerHTML = '<p id="loadingMsg">⏳ Buscando artigos, por favor aguarde...</p>';
+  searchBtn.disabled = true;
+  searchBtn.textContent = 'Buscando...';
+
+  try {
+    await app.runLesson(text);
+  } catch (err) {
+    console.error(err);
+    resultsDiv.innerHTML += '<p style="color: #ff6b6b;">Erro ao buscar artigos.</p>';
+  } finally {
+    const loadingMsg = document.getElementById('loadingMsg');
+    if (loadingMsg) loadingMsg.remove();
+    searchBtn.disabled = false;
+    searchBtn.textContent = '🔍 Buscar Artigos';
+  }
+
   saveHistory(text);
   renderHistory();
 }
@@ -54,8 +69,15 @@ window.addEventListener('search-results', (e: Event) => {
   const custom = e as CustomEvent;
   const { topic, articles } = custom.detail as { topic: string; articles: any[] };
   const header = document.createElement('h3');
-  header.textContent = `Tópico: ${topic}`;
+  header.textContent = `Tópico: ${topic} (${articles.length} resultados)`;
   resultsDiv.appendChild(header);
+
+  if (articles.length === 0) {
+    const emptyMsg = document.createElement('p');
+    emptyMsg.textContent = 'Nenhum artigo encontrado.';
+    resultsDiv.appendChild(emptyMsg);
+    return;
+  }
 
   const ul = document.createElement('ul');
   ul.className = 'list';
