@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Assistente de Busca de Artigos Científicos</title>
+  <link rel="stylesheet" href="/src/styles.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+</head>
+<body>
+  <div id="app">
+    <h1 class="card">Assistente de Busca de Artigos</h1>
+    <div class="card">
+      <textarea id="lessonInput" placeholder="Descreva o tema da aula (ex.: Ciência de Dados no cotidiano)..."></textarea>
+      <button id="searchBtn">🔍 Buscar Artigos</button>
+    </div>
+    <div id="history" class="card">
+      <h3>Histórico de pesquisas</h3>
+      <p>As últimas ideias inseridas aparecerão aqui.</p>
+    </div>
+    <div id="results" class="card"></div>
+  </div>
+  <script type="module" src="/src/main.ts"></script>
+</body>
+</html>
