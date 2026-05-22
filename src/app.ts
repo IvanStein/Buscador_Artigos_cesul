@@ -83,6 +83,7 @@ export class SearchEngine {
     return resultList.map((r: any) => ({
       id: r.id,
       title: r.title,
+
       authors: (r.authorString ?? '').split(',').map((a: string) => a.trim()),
       abstract: r.abstractText ?? '',
       pdfUrl: r.fullTextUrl?.url,
@@ -130,7 +131,7 @@ export class YouTubeDownloader {
 
 export class App {
   private engine = new SearchEngine();
-  private articleMgr = new ArticleManager();
+  public articleMgr = new ArticleManager();
   private telegram = new TelegramNotifier();
 
   async runLesson(lessonText: string) {
