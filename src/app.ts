@@ -78,10 +78,10 @@ export class SearchEngine {
 
   // Translate abstract using Groq
   async translateText(text: string): Promise<string> {
-    if (!text || text === 'Resumo não disponível.') return text;
+    if (!text || text.trim() === '' || text === 'Resumo não disponível.') return '(Sem resumo para traduzir)';
     
     const groqKey = ConfigManager.getGroqKey();
-    if (!groqKey) return '(Configure a chave Groq nas Configurações do sistema para habilitar tradução automática) ' + text;
+    if (!groqKey) return '(Configure a chave Groq nas Configurações do sistema para habilitar tradução automática)\n\n' + text;
 
     try {
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {
@@ -103,10 +103,14 @@ export class SearchEngine {
         })
       });
       const data = await resp.json();
-      return data.choices?.[0]?.message?.content || 'Erro ao traduzir.';
+      if (!resp.ok) {
+        console.error('Groq Translation API error response:', data);
+        return `(Erro na API de tradução: ${data.error?.message || 'Falha desconhecida'})\n\n${text}`;
+      }
+      return data.choices?.[0]?.message?.content || 'Erro ao extrair tradução da resposta.';
     } catch (err) {
       console.error('Translation error:', err);
-      return 'Erro de conexão na tradução.';
+      return `(Erro de conexão na tradução)\n\n${text}`;
     }
   }
 

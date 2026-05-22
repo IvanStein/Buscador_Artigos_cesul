@@ -246,7 +246,7 @@ async function renderSelectedArticles() {
     li.innerHTML = `
       <div class="article-info" style="width: 100%;">
         <h4 class="article-title" style="color: var(--color-primary);">${a.title}</h4>
-        <p><strong>Abstract Original:</strong> ${a.abstract}</p>
+        <p><strong>Abstract Original:</strong> ${a.abstract ? a.abstract : '(Resumo não disponível na fonte original)'}</p>
         <p><strong>Tradução (Groq):</strong> <em class="groq-translation" data-id="${a.id}">Traduzindo...</em></p>
         <div class="abnt-box">${abntCitation}</div>
       </div>
