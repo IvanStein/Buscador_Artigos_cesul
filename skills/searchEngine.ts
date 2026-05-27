@@ -56,7 +56,7 @@ export async function searchPubMed(query: string, maxResults = 10): Promise<Arti
 
 // arXiv search via ATOM feed (XML)
 export async function searchArxiv(query: string, maxResults = 10): Promise<Article[]> {
-  const url = `http://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${maxResults}`;
+  const url = `https://export.arxiv.org/api/query?search_query=all:${encodeURIComponent(query)}&start=0&max_results=${maxResults}`;
   const resp = await fetch(url);
   const text = await resp.text();
   const parser = new DOMParser();

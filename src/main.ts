@@ -83,6 +83,7 @@ async function startSearch(text: string) {
       <div class="spinner"></div>
       <p>Buscando nas fontes oficiais (PubMed, arXiv, Europe PMC)...</p>
     </div>
+    <div id="resultsContent"></div>
   `;
   searchBtn.disabled = true;
   searchBtn.textContent = 'Buscando...';
@@ -91,7 +92,8 @@ async function startSearch(text: string) {
     await app.runLesson(text);
   } catch (err) {
     console.error(err);
-    resultsDiv.innerHTML += '<p style="color: #ff6b6b;">Erro ao buscar artigos.</p>';
+    const resultsContent = document.getElementById('resultsContent') || resultsDiv;
+    resultsContent.innerHTML += '<p style="color: #ff6b6b;">Erro ao buscar artigos.</p>';
   } finally {
     const loadingMsg = document.getElementById('loadingMsg');
     if (loadingMsg) loadingMsg.remove();
@@ -112,14 +114,17 @@ searchBtn.addEventListener('click', () => {
 window.addEventListener('search-results', (e: Event) => {
   const custom = e as CustomEvent;
   const { topic, articles } = custom.detail as { topic: string; articles: any[] };
+  
+  const targetContainer = document.getElementById('resultsContent') || resultsDiv;
+  
   const header = document.createElement('h3');
   header.textContent = `Tópico: ${topic} (${articles.length} resultados)`;
-  resultsDiv.appendChild(header);
+  targetContainer.appendChild(header);
 
   if (articles.length === 0) {
     const emptyMsg = document.createElement('p');
     emptyMsg.textContent = 'Nenhum artigo encontrado.';
-    resultsDiv.appendChild(emptyMsg);
+    targetContainer.appendChild(emptyMsg);
     return;
   }
 
@@ -198,7 +203,7 @@ window.addEventListener('search-results', (e: Event) => {
     
     ul.appendChild(li);
   });
-  resultsDiv.appendChild(ul);
+  targetContainer.appendChild(ul);
 });
 
 function updateCartUI() {
@@ -208,6 +213,23 @@ function updateCartUI() {
   } else {
     selectedCart.style.display = 'none';
   }
+}
+
+// Toast notification helper
+function showToast(message: string) {
+  // Remove any existing toast first
+  const existing = document.querySelector('.toast-notification');
+  if (existing) existing.remove();
+
+  const toast = document.createElement('div');
+  toast.className = 'toast-notification';
+  toast.innerHTML = `<span>✔️</span> <span>${message}</span>`;
+  document.body.appendChild(toast);
+  setTimeout(() => {
+    toast.style.opacity = '0';
+    toast.style.transition = 'opacity 0.3s ease';
+    setTimeout(() => toast.remove(), 300);
+  }, 2500);
 }
 
 // Next Page Navigation
@@ -229,6 +251,27 @@ async function renderSelectedArticles() {
     selectedResults.innerHTML = '<p>Nenhum artigo selecionado.</p>';
     return;
   }
+
+  selectedResults.innerHTML = '';
+  
+  // Warning banner if Groq Key is missing
+  const groqKey = ConfigManager.getGroqKey();
+  if (!groqKey) {
+    const banner = document.createElement('div');
+    banner.className = 'warning-banner';
+    banner.innerHTML = `⚠️ <strong>Tradução automática desativada:</strong> insira sua chave Groq nas <a id="linkOpenSettings" href="#">Configurações</a> para traduzir os abstracts.`;
+    selectedResults.appendChild(banner);
+    
+    setTimeout(() => {
+      const link = document.getElementById('linkOpenSettings');
+      if (link) {
+        link.onclick = (e) => {
+          e.preventDefault();
+          btnSettings.click();
+        };
+      }
+    }, 0);
+  }
   
   const ul = document.createElement('ul');
   ul.className = 'article-list';
@@ -239,8 +282,6 @@ async function renderSelectedArticles() {
     li.style.flexDirection = 'column';
     li.style.alignItems = 'flex-start';
     
-    // Here we will inject translated abstract using Groq soon.
-    // And ABNT citation.
     const abntCitation = app.articleMgr.generateABNT(a);
     
     li.innerHTML = `
@@ -248,13 +289,23 @@ async function renderSelectedArticles() {
         <h4 class="article-title" style="color: var(--color-primary);">${a.title}</h4>
         <p><strong>Abstract Original:</strong> ${a.abstract ? a.abstract : '(Resumo não disponível na fonte original)'}</p>
         <p><strong>Tradução (Groq):</strong> <em class="groq-translation" data-id="${a.id}">Traduzindo...</em></p>
-        <div class="abnt-box">${abntCitation}</div>
+        <div style="display: flex; align-items: stretch; gap: 0.5rem; margin-top: 1rem; flex-wrap: wrap; width: 100%;">
+          <div class="abnt-box" style="flex: 1; margin-top: 0; min-width: 250px;">${abntCitation}</div>
+          <button class="btn-download btn-copy-citation" style="display: flex; align-items: center; justify-content: center; height: auto;">📋 Copiar Citação</button>
+        </div>
       </div>
     `;
+    
+    // Bind individual copy citation button
+    const btnCopyCitation = li.querySelector('.btn-copy-citation') as HTMLButtonElement;
+    btnCopyCitation.onclick = () => {
+      navigator.clipboard.writeText(abntCitation);
+      showToast('Citação ABNT copiada!');
+    };
+
     ul.appendChild(li);
   }
   
-  selectedResults.innerHTML = '';
   selectedResults.appendChild(ul);
   
   // Fire translations in background
@@ -268,6 +319,44 @@ async function renderSelectedArticles() {
     });
   }
 }
+
+// Export and Print buttons event bindings
+const btnCopyMarkdown = document.getElementById('btnCopyMarkdown') as HTMLButtonElement;
+if (btnCopyMarkdown) {
+  btnCopyMarkdown.onclick = () => {
+    let md = `# Material da Aula\n\n`;
+    for (const a of selectedArticles) {
+      const abnt = app.articleMgr.generateABNT(a);
+      md += `## ${a.title}\n\n`;
+      md += `**Fonte:** ${a.source}\n\n`;
+      md += `**Abstract Original:** ${a.abstract || 'Não disponível'}\n\n`;
+      const transEl = document.querySelector(`.groq-translation[data-id="${a.id}"]`);
+      const translation = transEl ? transEl.textContent : 'Não traduzido';
+      md += `**Tradução:** ${translation}\n\n`;
+      md += `**Citação ABNT:**\n\`\`\`\n${abnt}\n\`\`\`\n\n`;
+      md += `---\n\n`;
+    }
+    navigator.clipboard.writeText(md);
+    showToast('Material copiado em Markdown!');
+  };
+}
+
+const btnPrintMaterial = document.getElementById('btnPrintMaterial') as HTMLButtonElement;
+if (btnPrintMaterial) {
+  btnPrintMaterial.onclick = () => {
+    window.print();
+  };
+}
+
+// Suggestion buttons event bindings
+document.querySelectorAll('.suggestion-btn').forEach(btn => {
+  (btn as HTMLButtonElement).onclick = () => {
+    const topic = btn.getAttribute('data-value');
+    if (topic) {
+      startSearch(topic);
+    }
+  };
+});
 
 // Settings Logic
 btnSettings.onclick = () => {
@@ -284,7 +373,7 @@ btnSaveSettings.onclick = () => {
   ConfigManager.setGroqKey(inputGroqKey.value.trim());
   ConfigManager.setTelegramToken(inputTelegramToken.value.trim());
   settingsModal.style.display = 'none';
-  alert('Configurações salvas localmente com sucesso!');
+  showToast('Configurações salvas localmente!');
 };
 
 // Initialize UI

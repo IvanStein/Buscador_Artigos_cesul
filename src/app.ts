@@ -23,17 +23,63 @@ export class SearchEngine {
   async generateTopics(lessonText: string): Promise<string[]> {
     const groqKey = ConfigManager.getGroqKey();
     
-    const fallbackExtraction = () => {
-      const words = lessonText.toLowerCase().replace(/[^a-z0-9\s]/g, '').split(/\s+/).filter(w => w.length > 4);
-      if (words.length === 0) return lessonText.split(' ').slice(0, 3);
+    const translateFallback = async (text: string): Promise<string> => {
+      try {
+        const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text)}&langpair=pt|en`;
+        const resp = await fetch(url);
+        const data = await resp.json();
+        if (data && data.responseData && data.responseData.translatedText) {
+          return data.responseData.translatedText;
+        }
+      } catch (err) {
+        console.error('MyMemory API error:', err);
+      }
+      return text;
+    };
+
+    const fallbackExtraction = (text: string) => {
+      // English stop-words + generic terms to filter out from keyword results
+      const stopWords = new Set([
+        'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 
+        'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 
+        'cant', 'cannot', 'could', 'couldnt', 'did', 'didnt', 'do', 'does', 'doesnt', 'doing', 'dont', 
+        'down', 'during', 'each', 'few', 'for', 'from', 'further', 'had', 'hadnt', 'has', 'hasnt', 'have', 
+        'havent', 'having', 'he', 'hed', 'hell', 'hes', 'her', 'here', 'heres', 'hers', 'herself', 'him', 
+        'himself', 'his', 'how', 'hows', 'i', 'id', 'ill', 'im', 'ive', 'if', 'in', 'into', 'is', 'isnt', 
+        'it', 'its', 'itself', 'lets', 'me', 'more', 'most', 'mustnt', 'my', 'myself', 'no', 'nor', 'not', 
+        'of', 'off', 'on', 'once', 'only', 'or', 'other', 'ought', 'our', 'ours', 'ourselves', 'out', 
+        'over', 'own', 'same', 'shant', 'she', 'shed', 'shell', 'shes', 'should', 'shouldnt', 'so', 
+        'some', 'such', 'than', 'that', 'thats', 'the', 'their', 'theirs', 'them', 'themselves', 'then', 
+        'there', 'theres', 'these', 'they', 'theyd', 'theyll', 'theyre', 'theyve', 'this', 'those', 
+        'through', 'to', 'too', 'under', 'until', 'up', 'very', 'was', 'wasnt', 'we', 'wed', 'well', 
+        'were', 'weve', 'werent', 'what', 'whats', 'when', 'whens', 'where', 'wheres', 'which', 'while', 
+        'who', 'whos', 'whom', 'why', 'whys', 'with', 'wont', 'would', 'wouldnt', 'you', 'youd', 'youll', 
+        'youre', 'youve', 'your', 'yours', 'yourself', 'yourselves', 'challenges', 'desafios', 'gestao', 
+        'gestão', 'management', 'organization', 'organizations'
+      ]);
+
+      const words = text.toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .split(/\s+/)
+        .filter(w => w.length > 3 && !stopWords.has(w));
+      
+      if (words.length === 0) {
+        return text.split(' ').slice(0, 3).filter(w => w.length > 2);
+      }
+      
       const freq: Record<string, number> = {};
       for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
-      return Object.entries(freq).sort((a, b) => b[1] - a[1]).slice(0, 5).map(e => e[0]);
+      
+      // Sort words by frequency and pick top 4, plus we can include some common combinations or terms
+      return Object.entries(freq)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 4)
+        .map(e => e[0]);
     };
 
     if (!groqKey) {
-      // Fallback simple keyword extraction
-      return fallbackExtraction();
+      const translatedText = await translateFallback(lessonText);
+      return fallbackExtraction(translatedText);
     }
 
     try {
@@ -67,12 +113,14 @@ export class SearchEngine {
       const topics = content.split(',').map((s: string) => s.trim()).filter(Boolean);
       
       if (topics.length === 0) {
-         return fallbackExtraction();
+         const translatedText = await translateFallback(lessonText);
+         return fallbackExtraction(translatedText);
       }
       return topics;
     } catch (err) {
       console.error('Groq AI error:', err);
-      return fallbackExtraction();
+      const translatedText = await translateFallback(lessonText);
+      return fallbackExtraction(translatedText);
     }
   }
 
@@ -81,7 +129,7 @@ export class SearchEngine {
     if (!text || text.trim() === '' || text === 'Resumo não disponível.') return '(Sem resumo para traduzir)';
     
     const groqKey = ConfigManager.getGroqKey();
-    if (!groqKey) return '(Configure a chave Groq nas Configurações do sistema para habilitar tradução automática)\n\n' + text;
+    if (!groqKey) return '(Configure a chave Groq para habilitar tradução automática)';
 
     try {
       const resp = await fetch('https://api.groq.com/openai/v1/chat/completions', {

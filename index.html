@@ -31,14 +31,29 @@
       <h1 class="card">Assistente de Busca de Artigos</h1>
       <div class="card">
         <textarea id="lessonInput" placeholder="Descreva o tema da aula (ex.: Ciência de Dados no cotidiano)..."></textarea>
+        <div class="quick-suggestions">
+          <span class="suggestion-label">Sugestões rápidas:</span>
+          <button type="button" class="suggestion-btn" data-value="Ciência de Dados no cotidiano">📊 Ciência de Dados</button>
+          <button type="button" class="suggestion-btn" data-value="Inteligência Artificial na Educação">🤖 IA na Educação</button>
+          <button type="button" class="suggestion-btn" data-value="Mudanças Climáticas e Sustentabilidade">🌍 Mudanças Climáticas</button>
+          <button type="button" class="suggestion-btn" data-value="Metodologias Ativas de Aprendizagem">✏️ Metodologias Ativas</button>
+        </div>
         <button id="searchBtn">🔍 Buscar Artigos</button>
       </div>
       <div id="results" class="card" style="min-height: 200px;"></div>
     </main>
 
     <main class="main-content" id="mainSelected" style="display: none;">
-      <h1 class="card">Material da Aula</h1>
-      <button id="btnBackSearch" class="btn-secondary">⬅️ Voltar para Busca</button>
+      <div class="card header-card">
+        <h1 style="margin: 0 0 1rem 0;">Material da Aula</h1>
+        <div class="action-bar" style="border: none; margin: 0; padding: 0; justify-content: space-between; width: 100%; display: flex;">
+          <button id="btnBackSearch" class="btn-secondary">⬅️ Voltar para Busca</button>
+          <div style="display: flex; gap: 0.5rem;">
+            <button id="btnCopyMarkdown" class="btn-select">📋 Copiar Markdown</button>
+            <button id="btnPrintMaterial" class="btn-primary" style="margin: 0; width: auto;">🖨️ Imprimir Material</button>
+          </div>
+        </div>
+      </div>
       <div id="selectedResults" class="card"></div>
     </main>
   </div>
