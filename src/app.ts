@@ -37,8 +37,7 @@ export class SearchEngine {
       return text;
     };
 
-    const fallbackExtraction = (text: string) => {
-      // English stop-words + generic terms to filter out from keyword results
+    const fallbackExtraction = (text: string): string[] => {
       const stopWords = new Set([
         'about', 'above', 'after', 'again', 'against', 'all', 'am', 'an', 'and', 'any', 'are', 'arent', 
         'as', 'at', 'be', 'because', 'been', 'before', 'being', 'below', 'between', 'both', 'but', 'by', 
@@ -58,23 +57,41 @@ export class SearchEngine {
         'gestão', 'management', 'organization', 'organizations'
       ]);
 
-      const words = text.toLowerCase()
-        .replace(/[^a-z0-9\s]/g, '')
-        .split(/\s+/)
-        .filter(w => w.length > 3 && !stopWords.has(w));
+      const cleanText = text.toLowerCase().replace(/[^a-z0-9\s]/g, '');
+      const words = cleanText.split(/\s+/).filter(w => w.length > 2 && !stopWords.has(w));
       
+      const hasGenZ = cleanText.includes('generation z') || cleanText.includes('gen z');
+      const genZTerm = cleanText.includes('generation z') ? 'generation z' : 'gen z';
+
       if (words.length === 0) {
-        return text.split(' ').slice(0, 3).filter(w => w.length > 2);
+        return [text.split(' ').slice(0, 3).join(' ')];
       }
-      
-      const freq: Record<string, number> = {};
-      for (const w of words) freq[w] = (freq[w] ?? 0) + 1;
-      
-      // Sort words by frequency and pick top 4, plus we can include some common combinations or terms
-      return Object.entries(freq)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 4)
-        .map(e => e[0]);
+
+      const uniqueWords = Array.from(new Set(words));
+      const filteredWords = uniqueWords.filter(w => !['generation', 'gen', 'z'].includes(w));
+      const queries: string[] = [];
+
+      if (hasGenZ) {
+        if (filteredWords.length > 0) {
+          queries.push(`"${genZTerm}" ${filteredWords[0]}`);
+          if (filteredWords[1]) {
+            queries.push(`"${genZTerm}" ${filteredWords[1]}`);
+          }
+          queries.push(`"${genZTerm}"`);
+        } else {
+          queries.push(`"${genZTerm}"`);
+        }
+      } else {
+        queries.push(words.slice(0, 3).join(' '));
+        if (words.length > 1) {
+          queries.push(`${words[0]} ${words[1]}`);
+        }
+        if (words.length > 2) {
+          queries.push(`${words[0]} ${words[2]}`);
+        }
+      }
+
+      return Array.from(new Set(queries)).slice(0, 3);
     };
 
     if (!groqKey) {
