@@ -3,79 +3,358 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Assistente de Busca de Artigos Científicos</title>
+  <title>NotebookLM Dashboard (MCP)</title>
   <link rel="stylesheet" href="/src/styles.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
 </head>
-<body>
-  <div id="app">
+<body class="dark-mode">
+  <div id="app" class="dashboard-container">
+    
+    <!-- Sidebar: Notebook & Source management -->
     <aside class="sidebar">
-      <div id="history" class="card history-card">
-        <h3>Histórico de pesquisas</h3>
-        <p class="history-empty">As últimas ideias inseridas aparecerão aqui.</p>
-        <ul id="historyList" class="history-list"></ul>
-      </div>
-      <div id="selectedCart" class="card cart-card" style="display: none;">
-        <h3>Artigos Selecionados (<span id="cartCount">0</span>)</h3>
-        <button id="btnNextPage" class="btn-primary">Avançar para Aula ➡️</button>
+      <div class="sidebar-header">
+        <span class="logo-icon">📓</span>
+        <h2>NotebookLM MCP</h2>
       </div>
 
-      <div class="card settings-card">
-        <button id="btnSettings" class="btn-secondary" style="width:100%; border:none; padding:0.8rem; background:hsla(0,0%,100%,0.05); color:#fff; display:flex; align-items:center; gap:0.5rem; justify-content:center;">
-          ⚙️ Configurações
-        </button>
+      <div class="section-header">
+        <span class="section-title">Notebooks</span>
+        <button id="btnCreateNotebook" class="btn-mini-plus" title="Criar novo notebook">＋ Novo</button>
+      </div>
+      <div class="notebooks-container">
+        <ul id="notebookList" class="notebook-list">
+          <li class="notebook-empty">Carregando notebooks...</li>
+        </ul>
+      </div>
+
+      <div class="section-header">
+        <span class="section-title">Fontes</span>
+        <div class="source-actions" id="sourceActions" style="display: none;">
+          <button id="btnAddTextSource" class="btn-mini" title="Adicionar texto">📝 Texto</button>
+          <button id="btnAddUrlSource" class="btn-mini" title="Adicionar URL">🔗 Link</button>
+          <button id="btnDeepResearch" class="btn-mini" title="Pesquisa profunda na web">🔍 Pesquisa</button>
+        </div>
+      </div>
+      <div class="sources-container">
+        <ul id="sourceList" class="source-list">
+          <li class="source-empty">Nenhum notebook selecionado</li>
+        </ul>
+      </div>
+
+      <div class="sidebar-footer">
+        <div class="auth-status-badge" id="authBadge">
+          <span class="status-dot offline"></span>
+          <span id="authStatusText">Verificando auth...</span>
+        </div>
       </div>
     </aside>
 
-    <main class="main-content" id="mainSearch">
-      <h1 class="card">Assistente de Busca de Artigos</h1>
-      <div class="card">
-        <textarea id="lessonInput" placeholder="Descreva o tema da aula (ex.: Ciência de Dados no cotidiano)..."></textarea>
-        <div class="quick-suggestions">
-          <span class="suggestion-label">Sugestões rápidas:</span>
-          <button type="button" class="suggestion-btn" data-value="Ciência de Dados no cotidiano">📊 Ciência de Dados</button>
-          <button type="button" class="suggestion-btn" data-value="Inteligência Artificial na Educação">🤖 IA na Educação</button>
-          <button type="button" class="suggestion-btn" data-value="Mudanças Climáticas e Sustentabilidade">🌍 Mudanças Climáticas</button>
-          <button type="button" class="suggestion-btn" data-value="Metodologias Ativas de Aprendizagem">✏️ Metodologias Ativas</button>
-        </div>
-        <button id="searchBtn">🔍 Buscar Artigos</button>
-      </div>
-      <div id="results" class="card" style="min-height: 200px;"></div>
-    </main>
+    <!-- Main Content Area -->
+    <main class="main-content">
+      
+      <!-- Main Navigation Tabs -->
+      <nav class="main-nav">
+        <button class="nav-tab active" data-tab="chat-tab">💬 Conversar</button>
+        <button class="nav-tab" data-tab="studio-tab">🎨 Studio</button>
+        <button class="nav-tab" data-tab="settings-tab">⚙️ Autenticação & Configs</button>
+      </nav>
 
-    <main class="main-content" id="mainSelected" style="display: none;">
-      <div class="card header-card">
-        <h1 style="margin: 0 0 1rem 0;">Material da Aula</h1>
-        <div class="action-bar" style="border: none; margin: 0; padding: 0; justify-content: space-between; width: 100%; display: flex;">
-          <button id="btnBackSearch" class="btn-secondary">⬅️ Voltar para Busca</button>
-          <div style="display: flex; gap: 0.5rem;">
-            <button id="btnCopyMarkdown" class="btn-select">📋 Copiar Markdown</button>
-            <button id="btnPrintMaterial" class="btn-primary" style="margin: 0; width: auto;">🖨️ Imprimir Material</button>
+      <!-- TAB 1: CHAT -->
+      <section id="chat-tab" class="tab-content active">
+        <div class="chat-container">
+          <div class="chat-messages" id="chatMessages">
+            <div class="message system">
+              <div class="message-content">
+                Selecione um Notebook no menu lateral para começar a interagir ou fazer perguntas sobre suas fontes.
+              </div>
+            </div>
+          </div>
+          
+          <div class="chat-controls-floating">
+            <div class="instruction-bar">
+              <input type="text" id="chatInstruction" placeholder="Instruções para o chat (Ex: responda em português, seja formal...)" />
+            </div>
+            <div class="input-area">
+              <textarea id="chatInput" placeholder="Pergunte sobre os seus documentos..." rows="1"></textarea>
+              <button id="btnSendChat" class="btn-primary" disabled>Enviar ⚡</button>
+            </div>
           </div>
         </div>
-      </div>
-      <div id="selectedResults" class="card"></div>
+      </section>
+
+      <!-- TAB 2: STUDIO -->
+      <section id="studio-tab" class="tab-content">
+        <div class="studio-header">
+          <h2>Estúdio Criativo</h2>
+          <p>Gere resumos, áudios, slides, questionários ou mapas mentais a partir das fontes do notebook selecionado.</p>
+        </div>
+
+        <div class="studio-grid">
+          <!-- Audio Overview -->
+          <div class="studio-card" data-action="audio">
+            <div class="card-icon">🎙️</div>
+            <h3>Áudio Overview</h3>
+            <p>Gere um podcast em áudio explicando os principais conceitos das suas fontes.</p>
+            <button class="btn-studio-action" data-type="audio">Gerar Podcast</button>
+          </div>
+
+          <!-- Video Overview -->
+          <div class="studio-card" data-action="video">
+            <div class="card-icon">🎥</div>
+            <h3>Vídeo Overview</h3>
+            <p>Gere uma visão geral em formato de vídeo ou roteiro multimídia.</p>
+            <button class="btn-studio-action" data-type="video">Gerar Vídeo</button>
+          </div>
+
+          <!-- Slide Deck -->
+          <div class="studio-card" data-action="slides">
+            <div class="card-icon">📊</div>
+            <h3>Apresentação de Slides</h3>
+            <p>Crie uma estrutura completa de slides com os temas principais.</p>
+            <button class="btn-studio-action" data-type="slides">Gerar Slides</button>
+          </div>
+
+          <!-- Quiz -->
+          <div class="studio-card" data-action="quiz">
+            <div class="card-icon">📝</div>
+            <h3>Questionário / Quiz</h3>
+            <p>Crie um questionário com perguntas e respostas para testar conhecimento.</p>
+            <button class="btn-studio-action" data-type="quiz">Gerar Quiz</button>
+          </div>
+
+          <!-- Infographic -->
+          <div class="studio-card" data-action="infographic">
+            <div class="card-icon">💡</div>
+            <h3>Infográfico</h3>
+            <p>Esboce informações altamente visuais e estruturas lógicas em tópicos.</p>
+            <button class="btn-studio-action" data-type="infographic">Gerar Infográfico</button>
+          </div>
+
+          <!-- Detailed Report -->
+          <div class="studio-card" data-action="report">
+            <div class="card-icon">📄</div>
+            <h3>Relatório Detalhado</h3>
+            <p>Gere uma síntese aprofundada organizando tópicos complexos.</p>
+            <button class="btn-studio-action" data-type="report">Gerar Relatório</button>
+          </div>
+
+          <!-- Flashcards -->
+          <div class="studio-card" data-action="flashcards">
+            <div class="card-icon">🎴</div>
+            <h3>Flashcards</h3>
+            <p>Gere cartões de memorização rápida com termos e definições.</p>
+            <button class="btn-studio-action" data-type="flashcards">Gerar Flashcards</button>
+          </div>
+
+          <!-- Data Table -->
+          <div class="studio-card" data-action="datatable">
+            <div class="card-icon">🗂️</div>
+            <h3>Tabela de Dados</h3>
+            <p>Estruture informações dispersas das fontes em tabelas organizadas.</p>
+            <button class="btn-studio-action" data-type="datatable">Gerar Tabela</button>
+          </div>
+
+          <!-- Mind Map -->
+          <div class="studio-card" data-action="mindmap">
+            <div class="card-icon">🧠</div>
+            <h3>Mapa Mental</h3>
+            <p>Gere conceitos estruturados hierarquicamente para guiar o aprendizado.</p>
+            <button class="btn-studio-action" data-type="mindmap">Gerar Mapa Mental</button>
+          </div>
+        </div>
+
+        <!-- Studio Status Overlay / Live Logs -->
+        <div class="studio-status-panel" id="studioStatusPanel" style="display: none;">
+          <div class="panel-header">
+            <h3>Processamento no Estúdio</h3>
+            <button id="btnCloseStudioStatus" class="btn-close">&times;</button>
+          </div>
+          <div class="panel-body">
+            <div class="status-spinner-row">
+              <div class="spinner"></div>
+              <span id="studioProgressText">Iniciando geração...</span>
+            </div>
+            <div class="status-details" id="studioDetails"></div>
+            <button id="btnDeleteStudioAsset" class="btn-danger-mini" style="display:none;">Excluir Geração Atual</button>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: CONFIG & AUTH -->
+      <section id="settings-tab" class="tab-content">
+        <div class="settings-page">
+          <h2>Configuração de Autenticação</h2>
+          <p>O NotebookLM exige autenticação da conta Google para funcionar. Gerencie suas credenciais através desta tela.</p>
+          
+          <div class="card settings-auth-card">
+            <h3>Estado da Sessão</h3>
+            <div class="auth-details-row">
+              <span class="label">Status:</span>
+              <span id="authStatusTextDetail" class="status-label offline">Desconectado</span>
+            </div>
+            
+            <div class="button-group-row" style="margin-top: 1.5rem;">
+              <button id="btnRefreshAuth" class="btn-primary">Atualizar Autenticação (CLI)</button>
+              <button id="btnManualTokens" class="btn-secondary">Fornecer Tokens Manualmente</button>
+            </div>
+          </div>
+
+          <div class="card settings-mcp-card">
+            <h3>Logs de Execução do Proxy MCP</h3>
+            <div class="terminal-logs" id="terminalLogs">
+              [Proxy] Inicializando conexões...
+            </div>
+          </div>
+        </div>
+      </section>
     </main>
   </div>
 
-  <!-- Settings Modal -->
-  <div id="settingsModal" class="modal-overlay" style="display: none;">
-    <div class="card modal-content">
-      <h2>Configurações do Sistema</h2>
+  <!-- Modal: Create/Rename Notebook -->
+  <div id="notebookModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3 id="notebookModalTitle">Novo Notebook</h3>
       <div class="form-group">
-        <label for="inputGroqKey">Chave da API Groq (Tradução/Tópicos)</label>
-        <input type="password" id="inputGroqKey" placeholder="gsk_..." />
+        <label for="notebookModalInput">Nome do Notebook</label>
+        <input type="text" id="notebookModalInput" placeholder="Ex: Pesquisa de Inteligência Artificial" />
       </div>
-      <div class="form-group">
-        <label for="inputTelegramToken">Token do Telegram Bot (Opcional)</label>
-        <input type="password" id="inputTelegramToken" placeholder="123456:ABC-DEF1234..." />
-      </div>
-      <div class="action-bar" style="justify-content: flex-end;">
-        <button id="btnSaveSettings" class="btn-select selected">💾 Salvar Configurações</button>
-        <button id="btnCloseSettings" class="btn-secondary">Cancelar</button>
+      <div class="modal-buttons">
+        <button id="btnNotebookModalCancel" class="btn-secondary">Cancelar</button>
+        <button id="btnNotebookModalSave" class="btn-primary">Salvar</button>
       </div>
     </div>
   </div>
+
+  <!-- Modal: Add Source (Text) -->
+  <div id="sourceTextModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Adicionar Fonte de Texto</h3>
+      <div class="form-group">
+        <label for="sourceTextTitle">Título</label>
+        <input type="text" id="sourceTextTitle" placeholder="Ex: Artigo de Introdução" />
+      </div>
+      <div class="form-group">
+        <label for="sourceTextContent">Conteúdo do Texto</label>
+        <textarea id="sourceTextContent" rows="10" placeholder="Cole ou digite o texto aqui..."></textarea>
+      </div>
+      <div class="modal-buttons">
+        <button id="btnSourceTextCancel" class="btn-secondary">Cancelar</button>
+        <button id="btnSourceTextSave" class="btn-primary">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Source (URL) -->
+  <div id="sourceUrlModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Adicionar Fonte de Link / URL</h3>
+      <div class="form-group">
+        <label for="sourceUrlInput">Endereço URL</label>
+        <input type="url" id="sourceUrlInput" placeholder="https://exemplo.com/artigo-ou-post" />
+      </div>
+      <div class="modal-buttons">
+        <button id="btnSourceUrlCancel" class="btn-secondary">Cancelar</button>
+        <button id="btnSourceUrlSave" class="btn-primary">Adicionar</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: View Source Content -->
+  <div id="sourceViewModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content large">
+      <div class="modal-header">
+        <h3 id="sourceViewTitle">Visualizando Fonte</h3>
+        <button id="btnSourceViewClose" class="btn-close">&times;</button>
+      </div>
+      <div class="source-viewer-body" id="sourceViewBody">
+        Carregando...
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Manual Auth Tokens -->
+  <div id="manualTokensModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Salvar Tokens de Autenticação</h3>
+      <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 1rem;">
+        Cole as credenciais ou tokens de autenticação obtidas manualmente para NotebookLM.
+      </p>
+      <div class="form-group">
+        <label for="authSapisid">SAPISID</label>
+        <input type="password" id="authSapisid" placeholder="Valor SAPISID..." />
+      </div>
+      <div class="form-group">
+        <label for="authHsapisid">HSAPISID</label>
+        <input type="password" id="authHsapisid" placeholder="Valor HSAPISID..." />
+      </div>
+      <div class="form-group">
+        <label for="authSid">SID</label>
+        <input type="password" id="authSid" placeholder="Valor SID..." />
+      </div>
+      <div class="form-group">
+        <label for="authSsid">SSID</label>
+        <input type="password" id="authSsid" placeholder="Valor SSID..." />
+      </div>
+      <div class="modal-buttons">
+        <button id="btnManualTokensCancel" class="btn-secondary">Cancelar</button>
+        <button id="btnManualTokensSave" class="btn-primary">Salvar Credenciais</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Deep Research -->
+  <div id="researchModal" class="modal-overlay" style="display: none;">
+    <div class="modal-content">
+      <h3>Pesquisa Profunda de Fontes</h3>
+      <p style="font-size: 0.85rem; opacity: 0.8; margin-bottom: 1rem;">
+        Busque novas fontes relevantes na web para enriquecer seu notebook.
+      </p>
+      <div class="form-group">
+        <label for="researchQuery">Termo de Busca / Pergunta</label>
+        <input type="text" id="researchQuery" placeholder="Ex: Desafios da Geração Z nas empresas" />
+      </div>
+      <div class="form-group">
+        <label for="researchSource">Origem</label>
+        <select id="researchSource" class="select-custom">
+          <option value="web">Web (Internet)</option>
+          <option value="drive">Google Drive</option>
+        </select>
+      </div>
+      <div class="form-group">
+        <label for="researchMode">Modo de Pesquisa</label>
+        <select id="researchMode" class="select-custom">
+          <option value="fast">Rápida (~30 segundos, ~10 fontes)</option>
+          <option value="deep">Aprofundada (~5 minutos, ~40 fontes)</option>
+        </select>
+      </div>
+      <div class="modal-buttons">
+        <button id="btnResearchCancel" class="btn-secondary">Cancelar</button>
+        <button id="btnResearchStart" class="btn-primary">Iniciar Busca 🚀</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Research Status Overlay -->
+  <div class="studio-status-panel" id="researchStatusPanel" style="display: none; bottom: 2rem; right: 2rem;">
+    <div class="panel-header">
+      <h3>Pesquisa de Fontes em Andamento</h3>
+      <button id="btnCloseResearchStatus" class="btn-close">&times;</button>
+    </div>
+    <div class="panel-body">
+      <div class="status-spinner-row">
+        <div class="spinner"></div>
+        <span id="researchProgressText">Iniciando pesquisa profunda...</span>
+      </div>
+      <div class="status-details" id="researchDetails" style="color: #60a5fa; max-height: 250px;"></div>
+      <div id="researchImportArea" style="display: none; margin-top: 1rem;">
+        <button id="btnImportResearchSources" class="btn-primary" style="width: 100%;">Importar Fontes Encontradas 📥</button>
+      </div>
+    </div>
+  </div>
+
+
   <script type="module" src="/src/main.ts"></script>
 </body>
 </html>
